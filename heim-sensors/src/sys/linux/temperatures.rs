@@ -42,7 +42,7 @@ async fn hwmon_sensor(input: PathBuf) -> Result<TemperatureSensor> {
     let path = root.join("name");
     let unit_name = async {
         let mut name = rt::fs::read_to_string(path).await.map_err(Error::from)?;
-        let _ = name.pop();
+        let _ = name.pop(); // Remove traling newline
         Ok(name)
     };
     let path = root.join(file_name(prefix, b"label"));
@@ -50,7 +50,7 @@ async fn hwmon_sensor(input: PathBuf) -> Result<TemperatureSensor> {
         let label = rt::fs::read_to_string(path).await
             .ok()
             .map(|mut s| {
-                let _ = s.pop();
+                let _ = s.pop(); // Remove traling newline
                 s
             });
         Ok(label)
