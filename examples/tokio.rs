@@ -1,17 +1,14 @@
-//! Tiny example of using `heim` with `tokio` runtime.
+use futures::StreamExt;
+use heim::sensors;
 
 #[tokio::main]
-async fn main() -> heim::Result<()> {
-    let platform = heim::host::platform().await?;
-
-    println!(
-        "{} {} {} {} {}",
-        platform.system(),
-        platform.release(),
-        platform.hostname(),
-        platform.version(),
-        platform.architecture().as_str(),
-    );
-
+async fn main()->Result<(), Box<dyn std::error::Error>> {
+    let f = tokio::spawn(async move {
+        sensors::temperatures()
+            .collect::<Vec<Result<sensors::TemperatureSensor, heim::Error>>>()
+            .await
+            
+    }).await?;
+    println!("{:#?}", f);
     Ok(())
 }

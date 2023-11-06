@@ -8,7 +8,6 @@
 
 #![doc(html_root_url = "https://docs.rs/heim-cpu/0.1.0-rc.1")]
 #![deny(
-    unused,
     unused_imports,
     unused_features,
     bare_trait_objects,
@@ -16,7 +15,6 @@
     missing_debug_implementations,
     missing_docs,
     nonstandard_style,
-    dead_code,
     deprecated,
     broken_intra_doc_links
 )]

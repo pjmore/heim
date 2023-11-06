@@ -18,70 +18,61 @@ fn file_name(prefix: &OsStr, postfix: &[u8]) -> OsString {
     name
 }
 
-async fn read_temperature(path: PathBuf) -> Result<ThermodynamicTemperature> {
-    let contents = rt::fs::read_to_string(path).await?;
-    // Originally value is in millidegrees of Celsius
-    let value = contents.trim_end().parse::<f32>()?;
-
-    Ok(ThermodynamicTemperature::new::<
+fn read_temperature(path: PathBuf) -> impl Future<Output=Result<ThermodynamicTemperature>> + Send +'static {
+    async move {
+        let contents = rt::fs::read_to_string(path).await?;
+        // Originally value is in millidegrees of Celsius
+        let value = contents.trim_end().parse::<f32>()?;
+        let v =ThermodynamicTemperature::new::<
         thermodynamic_temperature::degree_celsius,
-    >(value / 1_000.0))
+    >(value / 1_000.0);
+        Ok(v)
+    }
 }
 
 async fn hwmon_sensor(input: PathBuf) -> Result<TemperatureSensor> {
     // It is guaranteed by `hwmon` and `hwmon_sensor` directory traversals,
     // that it is not a root directory and it points to a file.
     // Otherwise it is an implementation bug.
-    let root = input.parent().unwrap_or_else(|| unreachable!());
-    let prefix = match input.file_name() {
-        Some(name) => {
-            let offset = name.len() - b"input".len();
-            OsStr::from_bytes(&name.as_bytes()[..offset])
-        }
-        None => unreachable!(),
+    let root = input.parent().unwrap();
+    let name = input.file_name().unwrap();
+    let offset = name.len() - b"input".len(); 
+    let prefix = OsStr::from_bytes(&name.as_bytes()[..offset]);
+
+    let path = root.join("name");
+    let unit_name = async {
+        let mut name = rt::fs::read_to_string(path).await.map_err(Error::from)?;
+        let _ = name.pop();
+        Ok(name)
     };
-
-    let unit_name = rt::fs::read_to_string(root.join("name"))
-        .map_err(Error::from)
-        .map_ok(|mut string| {
-            // Dropping trailing `\n`
-            let _ = string.pop();
-            string
-        });
-    let label = rt::fs::read_to_string(root.join(file_name(prefix, b"label")))
-        .map_err(Error::from)
-        .map_ok(|mut string| {
-            // Dropping trailing `\n`
-            let _ = string.pop();
-            Some(string)
-        })
-        .or_else(|_e| {
-            // TODO: Would it be reasonable to propagate errors other than NotFound?
-            future::ok::<_, Error>(None)
-        });
-    let high = read_temperature(root.join(file_name(prefix, b"max")))
-        .map_ok(Some)
-        .or_else(|_e| {
-            // TODO: Would it be reasonable to propagate errors other than NotFound?
-            future::ok::<_, Error>(None)
-        });
-    let critical = read_temperature(root.join(file_name(prefix, b"crit")))
-        .map_ok(Some)
-        .or_else(|_e| {
-            // TODO: Would it be reasonable to propagate errors other than NotFound?
-            future::ok::<_, Error>(None)
-        });
+    let path = root.join(file_name(prefix, b"label"));
+    let label = async {
+        let label = rt::fs::read_to_string(path).await
+            .ok()
+            .map(|mut s| {
+                let _ = s.pop();
+                s
+            });
+        Ok(label)
+    };
+    let path = root.join(file_name(prefix, b"max"));
+    let high = async{
+        Ok(read_temperature(path).await.ok())
+    };
+    let path = root.join(file_name(prefix, b"crit"));
+    let critical = async {
+        Ok(read_temperature(path).await.ok())
+    };
     let current = read_temperature(input);
-
-    future::try_join5(unit_name, label, current, high, critical)
-        .map_ok(|(unit, label, current, high, critical)| TemperatureSensor {
-            unit,
-            label,
-            current,
-            high,
-            critical,
-        })
-        .await
+    let (unit, label, current, high, critical) = future::try_join5(unit_name, label, current,high, critical).await?;
+    Ok(TemperatureSensor {
+        unit,
+        label,
+        current,
+        high,
+        critical
+    })
+    
 }
 
 fn hwmon() -> impl Stream<Item = Result<TemperatureSensor>> {
@@ -110,7 +101,7 @@ fn hwmon() -> impl Stream<Item = Result<TemperatureSensor>> {
 // CentOS has an intermediate /device directory:
 // https://github.com/giampaolo/psutil/issues/971
 // https://github.com/nicolargo/glances/issues/1060
-fn hwmon_device() -> impl Stream<Item = Result<TemperatureSensor>> {
+fn hwmon_device() -> impl Stream<Item = Result<TemperatureSensor>> + Send {
     // TODO: It would be nice to have async glob matchers :(
     // Basically we are searching for `/sys/class/hwmon/temp*_*` files here
     rt::fs::read_dir(rt::linux::sysfs_root().join("class/hwmon"))
@@ -139,7 +130,7 @@ fn hwmon_device() -> impl Stream<Item = Result<TemperatureSensor>> {
 }
 
 // https://www.kernel.org/doc/Documentation/thermal/sysfs-api.txt
-fn thermal_zone() -> impl Stream<Item = Result<TemperatureSensor>> {
+fn thermal_zone() -> impl Stream<Item = Result<TemperatureSensor>> + Send {
     rt::fs::read_dir(rt::linux::sysfs_root().join("class/thermal"))
         .try_flatten_stream()
         .try_filter(|entry| {
