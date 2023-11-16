@@ -158,7 +158,7 @@ fn thermal_zone() -> impl Stream<Item = Result<TemperatureSensor>> + Send {
                 high: None,
                 critical: None,
             };
-
+            
             rt::fs::read_dir(root)
                 .try_flatten_stream()
                 .try_filter(|entry| {
