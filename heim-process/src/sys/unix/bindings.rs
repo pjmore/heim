@@ -1,7 +1,7 @@
-/// Copied from the Rust sources.
-///
-/// Reference: https://github.com/rust-lang/rust/blob/75cf41afb468152611212271bae026948cd3ba46/src/libstd/sys/unix/os.rs
 extern "C" {
+    /// Copied from the Rust sources.
+    ///
+    /// Reference: https://github.com/rust-lang/rust/blob/75cf41afb468152611212271bae026948cd3ba46/src/libstd/sys/unix/os.rs
     #[cfg(not(target_os = "dragonfly"))]
     #[cfg_attr(
         any(target_os = "macos", target_os = "ios", target_os = "freebsd"),

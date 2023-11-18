@@ -45,8 +45,9 @@ async fn hwmon_sensor(input: PathBuf) -> Result<TemperatureSensor> {
         let _ = name.pop(); // Remove traling newline
         Ok(name)
     };
-    let path = root.join(file_name(prefix, b"label"));
+    let path: PathBuf = root.join(file_name(prefix, b"label"));
     let label = async {
+
         let label = rt::fs::read_to_string(path).await
             .ok()
             .map(|mut s| {

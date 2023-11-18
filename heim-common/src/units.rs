@@ -8,3 +8,6 @@ pub use uom::si::u64::{Frequency, Information};
 pub use uom::si::{
     frequency, information, information_rate, ratio, thermodynamic_temperature, time,
 };
+
+pub use uom::si::rational32::Frequency as RationalFrequency;
+pub use uom::num_rational::Rational32;

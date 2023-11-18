@@ -9,7 +9,6 @@
     bare_trait_objects,
     future_incompatible,
     missing_debug_implementations,
-    missing_docs,
     nonstandard_style,
     deprecated,
     broken_intra_doc_links

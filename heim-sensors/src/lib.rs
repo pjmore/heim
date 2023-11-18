@@ -22,7 +22,8 @@
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
 mod sys;
-
+mod fans;
 mod temperatures;
 
 pub use self::temperatures::*;
+pub use self::fans::*;
